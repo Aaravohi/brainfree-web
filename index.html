@@ -146,13 +146,14 @@
 <script>
 let worker = new Worker('worker.js');
 
+// Handle worker messages (output or input requests)
 worker.onmessage = function(e){
     const msg = e.data;
-    if(msg.type === 'output'){
-        displayOutput(msg.data);
+    if(msg.type === 'done'){
+        displayOutput(msg.output);
     } else if(msg.type === 'needInput'){
         const inp = prompt("Input a char:");
-        worker.postMessage({type:'input', data: inp || '\0'});
+        worker.postMessage({type:'input', value: inp || '\0'});
     }
 };
 
@@ -169,12 +170,6 @@ function displayOutput(output){
     ctx.fillStyle="#0f0";
     ctx.font="20px monospace";
     ctx.fillText(output,10,40);
-}
-
-// ---------------- Run BrainFree ----------------
-function runBrainFree(){
-    const code = document.getElementById('code').value;
-    worker.postMessage(code);
 }
 
 // ---------------- Run with Enter / Shift+Enter ----------------
@@ -245,4 +240,3 @@ function loadExample(){
 <p style="text-align:right; color:#0f32bf; margin-top:20px; font-size:14px;">Made by Aaravohi</p>
 </body>
 </html>
-
