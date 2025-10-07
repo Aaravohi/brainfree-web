@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BrainFree Interpreter</title>
+<style>
+  body { 
+    font-family: monospace; 
+    background:#111; 
+    color:#eee; 
+    padding:20px; 
+    text-align: center;
+    overflow-x: hidden;
+  }
+  textarea { 
+    width:80%; 
+    height:200px; 
+    background:#222; 
+    color:#eee; 
+    font-family: monospace; 
+    padding:10px; 
+    display:block;
+    margin: 10px auto;
+    font-size:16px;
+    line-height:1.4em;
+  }
+  canvas { 
+    background:#222; 
+    display:block; 
+    margin: 10px auto;
+  }
+  button { padding:8px 15px; margin:5px; font-family: monospace; }
+  select { padding:5px 10px; margin:5px; }
+  .documentation { 
+    width:80%; 
+    margin: 20px auto; 
+    text-align: left; 
+    background:#222; 
+    padding:15px; 
+    border-radius:8px;
+  }
+  .documentation h2 { text-align:center; color:#0f0; }
+  #asciiPanel {
+    height: 100%;
+    width: 0;
+    position: fixed;
+    z-index: 100;
+    top: 0;
+    right: 0;
+    background-color: #222;
+    overflow-x: hidden;
+    overflow-y: auto;
+    transition: 0.3s;
+    padding-top: 20px;
+    color: #eee;
+  }
+  #asciiPanel table {
+    border-collapse: collapse;
+    width: 90%;
+    margin: 0 auto;
+    color: #eee;
+  }
+  #asciiPanel th, #asciiPanel td {
+    border: 1px solid #555;
+    padding: 5px;
+    text-align: center;
+  }
+  #asciiPanel th { background:#333; }
+  #asciiPanel .closeBtn {
+    position: absolute;
+    top: 10px;
+    right: 25px;
+    font-size: 30px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<h1 style="font-size:48px; margin-bottom:5px;">{[BrainFree]}</h1>
+<h2 style="font-size:24px; margin-top:0;">Interpreter</h2>
+
+<textarea id="code" placeholder="Enter BrainFree code here..." spellcheck="false"></textarea>
+<div>
+  <button onclick="runBrainFree()">Run</button>
+  <button onclick="openAsciiPanel()">ASCII Values</button>
+  <button onclick="saveSnippet()">Save Code</button>
+  <button onclick="loadSnippet()">Load Code</button>
+  <button onclick="shareSnippet()">Share Code</button>
+  <select id="exampleSelect" onchange="loadExample()">
+    <option value="">-- Select Example --</option>
+    <option value="[cell0:+79:out][cell+1:+75:out][cell+1:+33:out]">Say OK!</option>
+    <option value="[cell0:+72:out][cell+1:+101:out][cell+1:+108:out][cell+1:+108:out][cell+1:+111:out]">Hello</option>
+  </select>
+</div>
+
+<canvas id="outputCanvas" width="800" height="100"></canvas>
+
+<div class="documentation">
+  <h2>BrainFree Language Guide</h2>
+  <p>BrainFree is a simplified language inspired by Brainf***, (and made by Aaravohi) designed for educational and fun purposes. You manipulate “cells” in memory with explicit instructions.</p>
+  
+  <p><strong>Cells:</strong> <code>[cell_id:value:function]</code></p>
+  <ul>
+    <li><strong>cell_id</strong>: Moves the pointer relative to the current cell. Examples:
+      <ul>
+        <li><code>cell0</code> → start at cell 0</li>
+        <li><code>cell+1</code> → move one cell to the right</li>
+        <li><code>cell-2</code> → move two cells to the left</li>
+      </ul>
+    </li>
+    <li><strong>value</strong>: Change the cell’s numeric value. Examples:
+      <ul>
+        <li><code>+5</code> → add 5 to the cell</li>
+        <li><code>-3</code> → subtract 3 from the cell</li>
+        <li><code></code> → no change</li>
+      </ul>
+    </li>
+    <li><strong>function</strong>: Perform input/output actions.
+      <ul>
+        <li><code>out</code> → output the ASCII character corresponding to the cell’s value (.)</li>
+        <li><code>in</code> → input a character into the cell (,)</li>
+        <li><code></code> → no function</li>
+      </ul>
+    </li>
+  </ul>
+  
+  <p><strong>Loops:</strong> <code>{ ... }</code> repeats the enclosed commands while the current cell is nonzero, similar to Brainf***’s <code>[ ... ]</code>.</p>
+  
+  <p><strong>Example:</strong></p>
+  <pre>
+[cell+2:+5:out]  → Move two cells forward, add 5, output character
+  </pre>
+  
+  <p>You can combine multiple cells and loops to create complex programs, print messages, or manipulate memory values creatively!</p>
+</div>
+
+<div id="asciiPanel">
+  <span class="closeBtn" onclick="closeAsciiPanel()">&times;</span>
+  <h3 style="text-align:center; color:#0f0;">ASCII Table</h3>
+  <table id="asciiTable"></table>
+</div>
+
+<script>
+// ---------------- BrainFree Parser ----------------
+function parseCells(code){
+    let tokens = [], i=0;
+    while(i<code.length){
+        if(code[i]==='{'){
+            let depth=1,j=i+1;
+            while(j<code.length && depth>0){
+                if(code[j]==='{') depth++;
+                else if(code[j]==='}') depth--;
+                j++;
+            }
+            tokens.push({type:'loop',body:parseCells(code.slice(i+1,j-1))});
+            i=j;
+        } else if(code[i]==='['){
+            let j=i+1;
+            while(j<code.length && code[j]!==']') j++;
+            let parts = code.slice(i+1,j).split(':');
+            tokens.push({type:'cell',cell:parts[0]?.trim()||'',value:parts[1]?.trim()||'',func:parts[2]?.trim()||''});
+            i=j+1;
+        } else { i++; }
+    }
+    return tokens;
+}
+
+// ---------------- BrainFree -> Brainf*** ----------------
+function brainFreeToBF(tokens){
+    let bf='';
+    for(let tok of tokens){
+        if(tok.type==='cell'){
+            let m = tok.cell.match(/cell([+-]?\d+)?/);
+            if(m && m[1]) bf += (parseInt(m[1])>0 ? '>'.repeat(parseInt(m[1])) : '<'.repeat(-parseInt(m[1])));
+            let v = tok.value.match(/([+-]?\d+)?/);
+            if(v && v[1]) bf += (parseInt(v[1])>0 ? '+'.repeat(parseInt(v[1])) : '-'.repeat(-parseInt(v[1])));
+            if(tok.func==='out') bf += '.';
+            else if(tok.func==='in') bf += ',';
+        } else if(tok.type==='loop') bf += '[' + brainFreeToBF(tok.body) + ']';
+    }
+    return bf;
+}
+
+// ---------------- Run Brainf*** ----------------
+function runBrainfuck(code){
+    let tape = Array(30000).fill(0), p=0, pc=0, out='';
+    let stack=[], jump={};
+    for(let i=0;i<code.length;i++){
+        if(code[i]==='[') stack.push(i);
+        else if(code[i]===']'){ let j=stack.pop(); jump[i]=j; jump[j]=i; }
+    }
+    while(pc<code.length){
+        let ch = code[pc];
+        if(ch==='>') p++;
+        else if(ch==='<') p--;
+        else if(ch==='+') tape[p]=(tape[p]+1)%256;
+        else if(ch==='-') tape[p]=(tape[p]-1+256)%256;
+        else if(ch==='.'){ out+=String.fromCharCode(tape[p]); }
+        else if(ch===','){ let inp=prompt("Input a char:"); tape[p]=inp?inp.charCodeAt(0):0; }
+        else if(ch==='[' && tape[p]===0) pc=jump[pc];
+        else if(ch===']' && tape[p]!==0) pc=jump[pc];
+        pc++;
+    }
+    return out;
+}
+
+// ---------------- Run BrainFree ----------------
+function runBrainFree(){
+    const code = document.getElementById('code').value;
+    const bf = brainFreeToBF(parseCells(code));
+    const output = runBrainfuck(bf);
+
+    const outCanvas = document.getElementById('outputCanvas');
+    const ctx = outCanvas.getContext('2d');
+    ctx.fillStyle="#222";
+    ctx.fillRect(0,0,outCanvas.width,outCanvas.height);
+    ctx.fillStyle="#0f0";
+    ctx.font="20px monospace";
+    ctx.fillText(output,10,40);
+}
+
+// ---------------- Run with Enter / Shift+Enter ----------------
+const codeArea = document.getElementById('code');
+codeArea.addEventListener('keydown', function(e){
+    if(e.key === "Enter") {
+        if(e.shiftKey){
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = this.value.substring(0,start) + "\n" + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 1;
+            e.preventDefault();
+        } else {
+            e.preventDefault();
+            runBrainFree();
+        }
+    }
+});
+
+// ---------------- ASCII Side Panel ----------------
+function getAsciiChar(code){
+    if(code >= 32 && code <= 126) return String.fromCharCode(code);
+    else if(code >= 128 && code <= 256) return String.fromCharCode(code);
+    return ' ';
+}
+function openAsciiPanel(){
+    const panel = document.getElementById('asciiPanel');
+    panel.style.width = "400px";
+    const table = document.getElementById('asciiTable');
+    table.innerHTML = "<tr><th>Decimal</th><th>Char</th></tr>";
+    for(let i = 0; i <= 256; i++){
+        const char = getAsciiChar(i);
+        table.insertAdjacentHTML('beforeend', `<tr><td>${i}</td><td>${char}</td></tr>`);
+    }
+}
+function closeAsciiPanel(){ document.getElementById('asciiPanel').style.width = "0"; }
+
+// ---------------- Save / Load ----------------
+function saveSnippet(){
+    localStorage.setItem('brainfreeSnippet', document.getElementById('code').value);
+    alert("Code saved locally!");
+}
+function loadSnippet(){
+    const code = localStorage.getItem('brainfreeSnippet');
+    if(code) document.getElementById('code').value = code;
+    else alert("No saved code found.");
+}
+
+// ---------------- Share ----------------
+function shareSnippet(){
+    const code = encodeURIComponent(document.getElementById('code').value);
+    const shareURL = window.location.origin + window.location.pathname + "?code=" + code;
+    prompt("Share this URL:", shareURL);
+}
+window.addEventListener('load', function(){
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if(code) document.getElementById('code').value = decodeURIComponent(code);
+});
+
+// ---------------- Playground Examples ----------------
+function loadExample(){
+    const example = document.getElementById('exampleSelect').value;
+    if(example) document.getElementById('code').value = example;
+}
+</script>
+
+<p style="text-align:right; color:#0f32bf; margin-top:20px; font-size:14px;">Made by Aaravohi</p>
+</body>
+</html>
