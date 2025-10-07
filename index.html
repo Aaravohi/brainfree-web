@@ -19,25 +19,24 @@
     color:#eee; 
     font-family: monospace; 
     padding:10px; 
-    display:block; 
-    margin: 10px auto; 
-    font-size:16px; 
-    line-height:1.4em; 
+    display:block;
+    margin: 10px auto;
+    font-size:16px;
+    line-height:1.4em;
   }
   canvas { 
     background:#222; 
     display:block; 
-    margin: 10px auto; 
+    margin: 10px auto;
   }
-  button { padding:8px 15px; margin:5px; font-family: monospace; }
-  select { padding:5px 10px; margin:5px; }
+  button, select { padding:8px 15px; margin:5px; font-family: monospace; }
   .documentation { 
     width:80%; 
     margin: 20px auto; 
     text-align: left; 
     background:#222; 
     padding:15px; 
-    border-radius:8px; 
+    border-radius:8px;
   }
   .documentation h2 { text-align:center; color:#0f0; }
   #asciiPanel {
@@ -81,6 +80,7 @@
 <h2 style="font-size:24px; margin-top:0;">Interpreter</h2>
 
 <textarea id="code" placeholder="Enter BrainFree code here..." spellcheck="false"></textarea>
+
 <div>
   <button onclick="runBrainFree()">Run</button>
   <button onclick="openAsciiPanel()">ASCII Values</button>
@@ -96,53 +96,55 @@
 
 <canvas id="outputCanvas" width="800" height="100"></canvas>
 
+<!-- ---------------- BrainFree Documentation ---------------- -->
 <div class="documentation">
   <h2>BrainFree Language Guide</h2>
-  <p>BrainFree is a simplified language inspired by Brainf***, made by Aaravohi, designed for educational and fun purposes.</p>
+  <p>BrainFree is a simplified language inspired by Brainf***, created by Aaravohi for fun and educational purposes. You manipulate memory cells with explicit commands to create output.</p>
+
+  <p><strong>Cells:</strong> <code>[cell_id:value:function]</code></p>
+  <ul>
+    <li><strong>cell_id</strong>: moves the pointer relative to current cell.
+      <ul>
+        <li><code>cell0</code> → start at cell 0</li>
+        <li><code>cell+1</code> → move one cell right</li>
+        <li><code>cell-2</code> → move two cells left</li>
+      </ul>
+    </li>
+    <li><strong>value</strong>: change numeric value.
+      <ul>
+        <li><code>+5</code> → add 5</li>
+        <li><code>-3</code> → subtract 3</li>
+        <li><code></code> → no change</li>
+      </ul>
+    </li>
+    <li><strong>function</strong>: input/output actions.
+      <ul>
+        <li><code>out</code> → output ASCII char (.)</li>
+        <li><code>in</code> → input a char (,)</li>
+        <li><code></code> → no function</li>
+      </ul>
+    </li>
+  </ul>
+
+  <p><strong>Loops:</strong> <code>{ ... }</code> repeats enclosed commands while current cell is nonzero (Brainf*** style <code>[ ... ]</code>).</p>
+
+  <p><strong>Example:</strong></p>
+  <pre>
+[cell+2:+5:out]  → Move two cells forward, add 5, output character
+  </pre>
+
+  <p>Combine multiple cells and loops to create complex programs or print messages creatively.</p>
 </div>
 
+<!-- ---------------- ASCII Panel ---------------- -->
 <div id="asciiPanel">
   <span class="closeBtn" onclick="closeAsciiPanel()">&times;</span>
   <h3 style="text-align:center; color:#0f0;">ASCII Table</h3>
   <table id="asciiTable"></table>
 </div>
 
+<!-- ---------------- Scripts ---------------- -->
 <script src="brainfree.js"></script>
-<script>
-  // ---------------- Setup Web Worker ----------------
-  const worker = new Worker('worker.js');
-  worker.onmessage = function(e){
-      const outCanvas = document.getElementById('outputCanvas');
-      const ctx = outCanvas.getContext('2d');
-      ctx.fillStyle="#222";
-      ctx.fillRect(0,0,outCanvas.width,outCanvas.height);
-      ctx.fillStyle="#0f0";
-      ctx.font="20px monospace";
-      ctx.fillText(e.data,10,40);
-  };
-
-  function runBrainFree(){
-      const code = document.getElementById('code').value;
-      worker.postMessage(code);
-  }
-
-  // ---------------- Run with Enter / Shift+Enter ----------------
-  const codeArea = document.getElementById('code');
-  codeArea.addEventListener('keydown', function(e){
-      if(e.key === "Enter") {
-          if(e.shiftKey){
-              const start = this.selectionStart;
-              const end = this.selectionEnd;
-              this.value = this.value.substring(0,start) + "\n" + this.value.substring(end);
-              this.selectionStart = this.selectionEnd = start + 1;
-              e.preventDefault();
-          } else {
-              e.preventDefault();
-              runBrainFree();
-          }
-      }
-  });
-</script>
 
 <p style="text-align:right; color:#0f32bf; margin-top:20px; font-size:14px;">Made by Aaravohi</p>
 </body>
