@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BrainFree Interpreter - Terminal Interface</title>
+<style>
+  /* Define the new syntax highlighting colors inspired by popular editor themes */
+  :root {
+    --color-background: #0d0d0d;
+    --color-terminal-green: #00ff41; 
+    --color-main-text: #F8F8F2; /* Off-white for general text */
+    --color-dark-blue: #0f32bf; /* Specific color for footer glow */
+    --color-white-glow: #FFFFFF; /* New white glow for pointer */
+    
+    /* New Syntax Colors (Python-like) */
+    --syntax-cell: #FFC66D;     /* Soft Orange/Yellow for Pointers/Variables */
+    --syntax-func: #66D9EF;     /* Cyan for Keywords/Functions */
+    --syntax-bracket: #A6E22E;  /* Bright Green for Structure {}[] */
+    --syntax-op-sign: #F92672;  /* Bright Pink/Red for Operators */
+    --syntax-value: #AE81FF;    /* Purple/Magenta for Numerical Values */
+    --syntax-colon: #F8F8F2;    /* Off-white for Punctuation */
+  }
+
+  /* Base Styles - Terminal Aesthetic */
+  body { 
+    font-family: 'Inter', monospace; 
+    background: var(--color-background); 
+    color: var(--color-terminal-green); /* Neon Green for accent */
+    padding: 20px; 
+    text-align: center;
+    overflow-x: hidden;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  
+  /* Main Container for Responsiveness */
+  #app-container {
+    display: flex;
+    flex-direction: column;
+    width: 95%;
+    max-width: 1200px;
+    margin-top: 10px;
+  }
+
+  /* Footer Glow - Dark Blue */
+  .footer-glow {
+    text-align: right; 
+    margin-top: 20px; 
+    font-size: 14px;
+    color: var(--color-dark-blue); 
+    text-shadow: 0 0 8px rgba(15, 50, 191, 0.8); /* Dark blue glow effect */
+    transition: all 0.5s ease-in-out;
+  }
+  .footer-glow:hover {
+     text-shadow: 0 0 15px rgba(15, 50, 191, 1);
+  }
+
+  /* Blur Effect */
+  #main-content.blurred {
+    filter: blur(5px);
+    pointer-events: none; /* Prevent interaction with blurred elements */
+    transition: filter 0.3s ease-in-out;
+  }
+
+  /* Code Editor Container for Highlighting */
+  #editor-container {
+    position: relative;
+    width: 100%;
+    height: 300px; /* Needs to match the textarea height */
+    margin: 10px 0;
+  }
+
+  /* Code Highlighter DIV (Read-only styled content) */
+  #codeHighlighter {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #1a1a1a;
+    font-family: monospace;
+    padding: 15px;
+    font-size: 16px;
+    line-height: 1.5em;
+    border: 2px solid #004400;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+    white-space: pre-wrap; /* Preserve spacing and newlines */
+    text-align: left;
+    overflow: hidden; /* Only the textarea should handle scroll */
+    box-sizing: border-box;
+    pointer-events: none; /* Do not block mouse events for the textarea */
+    color: var(--color-main-text); /* Base color for unhighlighted text */
+  }
+
+  /* Code Editor Textarea (Input layer) */
+  textarea#code {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent; /* Make background transparent */
+    color: transparent !important; 
+    font-family: monospace;
+    caret-color: var(--color-terminal-green); /* Keep the cursor visible */
+    z-index: 10;
+    padding: 15px; 
+    margin: 0; 
+    border: 2px solid #004400; 
+    border-radius: 8px;
+    box-shadow: none; 
+    resize: vertical; 
+    box-sizing: border-box;
+    font-size: 16px; 
+    line-height: 1.5em; 
+  }
+
+  /* Syntax Highlighting Color Classes */
+  .syntaxCell { color: var(--syntax-cell); }
+  .syntaxFunc { color: var(--syntax-func); }
+  .syntaxBracket { color: var(--syntax-bracket); }
+  .syntaxOpSign { color: var(--syntax-op-sign); }
+  .syntaxValue { color: var(--syntax-value); }
+  .syntaxColon { color: var(--syntax-colon); }
+  
+  /* Canvas Style - Unified Output/Memory Display */
+  canvas { 
+    background: #1a1a1a; 
+    display: block; 
+    margin: 10px 0;
+    border: 2px solid #004400;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+    width: 100%; /* Make it fluid */
+    height: 250px; /* Increased height for tape visualization */
+    cursor: grab; /* Indicate it's interactive */
+  }
+
+  /* Button Styling - Sci-Fi Controls */
+  button, select { 
+    padding: 10px 18px; 
+    margin: 5px; 
+    font-family: 'Inter', monospace;
+    color: var(--color-background); /* Dark text on bright background */
+    background: var(--color-terminal-green);
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+    box-shadow: 0 0 5px var(--color-terminal-green);
+  }
+  button:hover, select:hover {
+    background: #99ffaa;
+    box-shadow: 0 0 15px var(--color-terminal-green);
+  }
+
+  /* Documentation/Guide Container */
+  .documentation { 
+    width: 100%; 
+    margin: 20px 0; 
+    text-align: left; 
+    background: #1a1a1a; 
+    padding: 20px; 
+    border-radius: 8px;
+    border-left: 5px solid var(--color-terminal-green);
+    color: var(--color-main-text);
+  }
+  .documentation h2 { 
+    text-align: left; 
+    color: var(--color-terminal-green); 
+    border-bottom: 1px solid #004400;
+    padding-bottom: 5px;
+    margin-top: 0;
+    margin-bottom: 15px;
+  }
+  .documentation p, .documentation ul { margin-bottom: 15px; }
+  .documentation ul { list-style-type: disc; padding-left: 20px; }
+  .documentation li { margin-bottom: 8px; }
+  .documentation code { background: #004400; padding: 2px 4px; border-radius: 3px; color: var(--color-terminal-green); }
+
+  /* ASCII Panel Styles - IMPROVED LOOK */
+  #asciiPanel {
+    height: 100%;
+    width: 0;
+    position: fixed;
+    z-index: 100;
+    top: 0;
+    right: 0;
+    background-color: #1a1a1a; 
+    overflow-x: hidden;
+    overflow-y: auto;
+    transition: 0.3s;
+    padding-top: 20px;
+    color: var(--color-main-text);
+    box-shadow: -5px 0 15px rgba(0, 255, 65, 0.3);
+  }
+  #asciiPanel table {
+    border-collapse: collapse;
+    width: 95%;
+    margin: 10px auto;
+    color: var(--color-main-text);
+    font-size: 14px;
+    border: 2px solid var(--color-terminal-green);
+  }
+  #asciiPanel th, #asciiPanel td {
+    padding: 8px 5px;
+    text-align: center;
+    border: none; /* Removed inner border */
+  }
+  #asciiPanel th { 
+    background: var(--color-terminal-green); 
+    color: var(--color-background);
+    font-size: 16px;
+    font-weight: bold;
+    text-shadow: none;
+    border-bottom: 2px solid var(--color-terminal-green);
+  }
+  #asciiPanel tr:nth-child(even) {
+    background-color: #0d0d0d; /* Subtle alternating rows */
+  }
+  #asciiPanel tr:nth-child(odd) {
+    background-color: #1a1a1a;
+  }
+  #asciiPanel .closeBtn {
+    position: absolute;
+    top: 10px;
+    right: 25px;
+    font-size: 30px;
+    cursor: pointer;
+    color: var(--syntax-op-sign); /* Bright Pink/Red close button */
+  }
+
+  /* Custom Message Box/Modal */
+  #messageBox {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #1a1a1a;
+    border: 2px solid var(--color-terminal-green);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+    z-index: 200;
+    display: none; /* Hidden by default */
+    width: 300px;
+    text-align: left;
+    color: var(--color-terminal-green);
+  }
+  #messageBox input {
+    width: 100%;
+    padding: 8px;
+    margin: 10px 0;
+    background: var(--color-background);
+    border: 1px solid var(--color-terminal-green);
+    color: var(--color-terminal-green);
+    border-radius: 4px;
+  }
+  #messageBox button {
+    display: block;
+    margin: 10px auto 0;
+    width: 100px;
+    color: var(--color-background);
+    background: var(--color-terminal-green);
+  }
+</style>
+</head>
+<body>
+
+<div id="app-container">
+  <!-- Wrapper for Blur Effect -->
+  <div id="main-content">
+    <h1 style="font-size:48px; margin-bottom:5px; text-shadow: 0 0 5px var(--color-terminal-green);">{[BrainFree]}</h1>
+    <h2 style="font-size:24px; margin-top:0; color:var(--color-main-text);">Interpreter Terminal</h2>
+
+    <!-- Controls -->
+    <div style="margin-bottom: 10px; display: flex; flex-wrap: wrap; justify-content: center;">
+      <button onclick="runBrainFree()">RUN CODE</button>
+      <select id="exampleSelect" onchange="loadExample()">
+        <option value="">-- Load Example --</option>
+        <!-- UPDATED HELLO WORLD EXAMPLE -->
+        <option value="[cell0:+72:out][cell+1:+101:out][cell+1:+108:out][cell+1:+108:out][cell+1:+111:out][cell+1:+32:out][cell+1:+87:out][cell+1:+111:out][cell+1:+114:out][cell+1:+108:out][cell+1:+100:out][cell+1:+33:out]">Hello World!</option>
+        <option value="[cell0:+0:] [cell+1:+4:] { [cell-1:+3:] [cell+1:-1:] }">Multiply 3x4 (Result 12 in C0 - Simple Method)</option>
+      </select>
+      <button onclick="saveSnippet()">SAVE</button>
+      <button onclick="loadSnippet()">LOAD</button>
+      <button onclick="shareSnippet()">SHARE</button>
+      <button onclick="openAsciiPanel()">ASCII TABLE</button>
+    </div>
+    
+    <!-- Code Editor with Syntax Highlighter -->
+    <div id="editor-container">
+      <div id="codeHighlighter"></div>
+      <textarea id="code" placeholder="Enter BrainFree code here..." spellcheck="false"></textarea>
+    </div>
+
+    <canvas id="outputCanvas" width="800" height="250"></canvas>
+
+    <div class="documentation">
+      <h2>&gt; Language Guide: BrainFree (BF)</h2>
+      <p>BrainFree is a structured, simplified adaptation of the Brainf*ck language. It abstracts the tedious single-byte operations into clear, structured instructions, making complex BF operations like multiplication more readable.</p>
+      
+      <h3>1. The Instruction Block: <code>[cell_id:value:function]</code></h3>
+      <p>This is the primary unit of code, performing up to three actions in a single statement:</p>
+      <ul>
+        <li><strong>cell_id (Pointer Movement):</strong> Specifies the cell to move the memory pointer to. This is <strong>relative to the current pointer position.</strong>
+          <ul>
+            <li><code>cell0</code>: Moves the pointer to the absolute cell index 0.</li>
+            <li><code>cell+N</code>: Moves the pointer N cells to the right. (Translates to N `>` characters).</li>
+            <li><code>cell-N</code>: Moves the pointer N cells to the left. (Translates to N `<` characters).</li>
+          </ul>
+        </li>
+        <li><strong>value (Cell Change):</strong> Specifies how to adjust the value of the final cell reached by the `cell_id` movement.
+          <ul>
+            <li><code>+N</code>: Adds N to the cell's value. (Translates to N `+` characters).</li>
+            <li><code>-N</code>: Subtracts N from the cell's value. (Translates to N `-` characters).</li>
+            <li>Empty (e.g., `[cell+1: :out]`): No change is made to the cell value.</li>
+          </ul>
+        </li>
+        <li><strong>function (I/O Operation):</strong> Specifies an Input or Output operation on the cell.
+          <ul>
+            <li><code>out</code>: Prints the cell's current value as an ASCII character. (Translates to `.`).</li>
+            <li><code>in</code>: Reads a single character from the input and stores its ASCII value (0-255) in the cell. (Translates to `,`).</li>
+            <li>Empty (e.g., `[cell+1:+1:]`): No I/O operation is performed.</li>
+          </ul>
+        </li>
+      </ul>
+      
+      <h3>2. The Loop Structure: <code>{ ... }</code></h3>
+      <p>The loop is used for iteration and complex control flow, similar to a <code>while(cell != 0)</code> loop.</p>
+      <ul>
+        <li><code>{ commands }</code>: Repeats all enclosed commands as long as the cell currently pointed to has a nonzero value. (Translates to `[ commands ]`).</li>
+        <li>It is essential to ensure the loop body eventually causes the pointer to return to the starting cell, and that cell's value is changed (usually decremented) to prevent an infinite loop.</li>
+      </ul>
+    </div>
+
+    <p class="footer-glow">Made by Aaravohi</p>
+  </div>
+</div>
+
+<!-- ASCII Side Panel (Modal) -->
+<div id="asciiPanel">
+  <span class="closeBtn" onclick="closeAsciiPanel()">&times;</span>
+  <h3 style="text-align:center; color:var(--color-terminal-green);">ASCII Table Reference</h3>
+  <table id="asciiTable"></table>
+</div>
+
+<!-- Custom Message Box (Modal) -->
+<div id="messageBox">
+  <p id="messageText" style="margin: 0; font-weight: bold;"></p>
+  <input type="text" id="messageInput" style="display: none;">
+  <button id="messageButton" onclick="closeMessageBox()">SUBMIT</button>
+</div>
+
+
+<script>
+// Global variables
+let canvasWidth = 800; // Will be updated on load
+let canvasHeight = 250;
+const mainContent = document.getElementById('main-content'); // Main content area for blur effect
+let resolveInput = null; // Used to hold the Promise resolve function for async input
+let currentTapeStartIndex = 0; // Tracks the first cell index displayed on the canvas
+
+// ---------------- ASYNC INPUT HANDLERS ----------------
+
+/**
+ * Shows the input modal and returns a Promise that resolves when the user submits.
+ */
+function getInputChar() {
+    return new Promise(resolve => {
+        resolveInput = resolve; // Store the resolve function globally
+        showMessageBox("BrainFree Input (',') - Enter a character (only first character is used):", true, "SUBMIT");
+    });
+}
+
+// ---------------- MESSAGE BOX HANDLER (REPLACES alert/prompt) ----------------
+function showMessageBox(text, showInput = false, buttonText = "OK"){
+    const msgBox = document.getElementById('messageBox');
+    const msgText = document.getElementById('messageText');
+    const msgInput = document.getElementById('messageInput');
+    const msgButton = document.getElementById('messageButton');
+
+    msgText.textContent = text;
+    msgButton.textContent = buttonText;
+    
+    if (showInput) {
+        msgInput.style.display = 'block';
+        msgInput.value = '';
+        msgInput.focus();
+    } else {
+        msgInput.style.display = 'none';
+    }
+
+    msgBox.style.display = 'block';
+    mainContent.classList.add('blurred'); // ADD BLUR EFFECT
+}
+
+function closeMessageBox(){
+    const msgBox = document.getElementById('messageBox');
+    const msgInput = document.getElementById('messageInput');
+    
+    if (resolveInput) {
+        // If an input was visible, pass its value. Otherwise, pass null (for simple OK alerts).
+        const result = msgInput.style.display !== 'none' ? msgInput.value : null;
+        resolveInput(result);
+    }
+    
+    // Reset state and UI
+    resolveInput = null;
+    msgBox.style.display = 'none';
+    mainContent.classList.remove('blurred'); // REMOVE BLUR EFFECT
+}
+
+
+// ---------------- BrainFree Parser ----------------
+function parseCells(code){
+    let tokens = [], i=0;
+    while(i<code.length){
+        if(code[i]==='{'){
+            let depth=1,j=i+1;
+            while(j<code.length && depth>0){
+                if(code[j]==='{') depth++;
+                else if(code[j]==='}') depth--;
+                if(j >= code.length && depth > 0) throw new Error("Mismatched Loop: Missing closing '}' for opening '{' at index " + i);
+                j++;
+            }
+            tokens.push({type:'loop',body:parseCells(code.slice(i+1,j-1))});
+            i=j;
+        } else if(code[i]==='['){
+            let j=i+1;
+            while(j<code.length && code[j]!==']') j++;
+            if(j >= code.length) throw new Error("Mismatched Cell: Missing closing ']' for opening '[' at index " + i);
+            
+            let parts = code.slice(i+1,j).split(':');
+            if(parts.length !== 3) throw new Error("Cell Syntax Error: Must have exactly two colons [cell:value:func] inside brackets at index " + i);
+
+            tokens.push({type:'cell',cell:parts[0]?.trim()||'',value:parts[1]?.trim()||'',func:parts[2]?.trim()||''});
+            i=j+1;
+        } else { i++; }
+    }
+    return tokens;
+}
+
+// ---------------- BrainFree -> Brainf*** ----------------
+function brainFreeToBF(tokens){
+    let bf='';
+    for(let tok of tokens){
+        if(tok.type==='cell'){
+            // Check for both 'cellN' and 'cell+N' or 'cell-N' format.
+            let m = tok.cell.match(/cell\s*([+-]?\d+)?/);
+            if (!m) throw new Error(`Invalid cell_id format: "${tok.cell}". Use cell0, cell+N, or cell-N.`);
+            
+            // Extract the number (if available) and remove sign/spaces for calculation
+            const cellPart = m[1] ? m[1].replace(/\s/g, '') : '0'; // Default to '0' if no number part
+            
+            // Cell Movement calculation
+            const move = parseInt(cellPart);
+            bf += (move>0 ? '>'.repeat(move) : '<'.repeat(-move));
+
+            // Value Change
+            let v = tok.value.match(/([+-]?\d+)?/);
+            if(v && v[1]){
+              const val = parseInt(v[1]);
+              bf += (val>0 ? '+'.repeat(val) : '-'.repeat(-val));
+            }
+            
+            // Function
+            if(tok.func==='out') bf += '.';
+            else if(tok.func==='in') bf += ',';
+            else if(tok.func.length > 0) throw new Error(`Invalid function: "${tok.func}". Must be 'out', 'in', or empty.`);
+            
+        } else if(tok.type==='loop') bf += '[' + brainFreeToBF(tok.body) + ']';
+    }
+    return bf;
+}
+
+// ---------------- Run Brainf*** (ASYNC) ----------------
+async function runBrainfuck(code){
+    // Brainf*ck tape is 30,000 cells, initialized to 0. Values wrap 0-255.
+    let tape = Array(30000).fill(0), p=0, pc=0, out='';
+    let stack=[], jump={};
+    
+    // Pass 1: Bracket matching and jump table creation (with error handling)
+    for(let i=0;i<code.length;i++){
+        if(code[i]==='[') stack.push(i);
+        else if(code[i]===']'){ 
+            if(stack.length === 0) throw new Error("Mismatched Loop: Missing opening '[' for ']' (from BrainFree code conversion).");
+            let j=stack.pop(); 
+            jump[i]=j; 
+            jump[j]=i; 
+        }
+    }
+    if(stack.length > 0) throw new Error("Mismatched Loop: Missing closing ']' (from BrainFree code conversion).");
+    
+    // Pass 2: Execution
+    while(pc<code.length){
+        let ch = code[pc];
+        
+        // Pointer boundary check
+        if((ch==='>' && p>=29999) || (ch==='<' && p<=0)) {
+             throw new Error("Pointer out of bounds! Tried to move to cell index " + (p + (ch==='>'?1:-1)));
+        }
+
+        if(ch==='>') p++;
+        else if(ch==='<') p--;
+        // Increment/Decrement logic ensures 0-255 wrapping
+        else if(ch==='+') tape[p]=(tape[p]+1)%256; 
+        else if(ch==='-') tape[p]=(tape[p]-1+256)%256;
+        else if(ch==='.'){ out+=String.fromCharCode(tape[p]); }
+        
+        // Use async custom input box and AWAIT the result
+        else if(ch===','){ 
+            const inp = await getInputChar();
+            // Take the charCode of the first character, or 0 if input is null/empty.
+            tape[p] = (inp && inp.length > 0) ? inp.charCodeAt(0) : 0;
+        }
+        else if(ch==='[' && tape[p]===0) pc=jump[pc];
+        else if(ch===']' && tape[p]!==0) pc=jump[pc];
+        pc++;
+    }
+    return {output: out, tape: tape, pointer: p}; // Return all state data
+}
+
+
+// ---------------- Draw Canvas Memory Tape ----------------
+function drawCanvasMemoryTape(ctx, tape, pointer, startIndex){
+    const PADDING = 20;
+    // Cell size adjusted for more cells visible on the strip
+    const CELL_SIZE = 40; 
+    const GAP = 5;
+    const LINE_Y = canvasHeight - 80; // Tape line position
+    
+    // Calculate how many cells fit (Approx 16 cells now)
+    const CELLS_TO_DISPLAY = Math.floor((canvasWidth - 2 * PADDING) / (CELL_SIZE + GAP));
+    
+    // Draw Tape Title
+    ctx.fillStyle = varColor('terminal-green');
+    ctx.font = "bold 16px monospace";
+    ctx.fillText("MEMORY TAPE (Cells " + startIndex + " - " + (startIndex + CELLS_TO_DISPLAY - 1) + ")", PADDING, LINE_Y - 30);
+    
+    for(let i = 0; i < CELLS_TO_DISPLAY; i++){
+        const cellIndex = startIndex + i;
+        const cellValue = tape[cellIndex] || 0;
+        const X = PADDING + i * (CELL_SIZE + GAP);
+        const Y = LINE_Y;
+        
+        const isPointer = (cellIndex === pointer);
+        
+        // 1. Draw Cell Box STROKE
+        // Pointer uses white glow color, others use dark green accent
+        ctx.strokeStyle = isPointer ? varColor('white-glow') : "#004400"; 
+        ctx.lineWidth = isPointer ? 3 : 1;
+        ctx.strokeRect(X, Y, CELL_SIZE, CELL_SIZE);
+        
+        // 2. Draw Pointer Shadow (White Glow)
+        if (isPointer) {
+             ctx.shadowColor = varColor('white-glow'); // White shadow
+             ctx.shadowBlur = 15;
+             ctx.strokeRect(X, Y, CELL_SIZE, CELL_SIZE); // Redraw to apply shadow
+             ctx.shadowBlur = 0; // Reset shadow
+        }
+        
+        // 3. Draw Cell Index (Top)
+        // Pointer index uses white color, others use grey
+        ctx.fillStyle = isPointer ? varColor('white-glow') : "#999999"; 
+        ctx.font = "10px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("C" + cellIndex, X + CELL_SIZE / 2, Y - 5);
+        
+        // 4. Draw Cell Value (Center)
+        // Fill interior dark for ALL cells (to ensure text visibility)
+        ctx.fillStyle = "#1a1a1a"; 
+        ctx.fillRect(X + 1, Y + 1, CELL_SIZE - 2, CELL_SIZE - 2); 
+        
+        // Set text color to terminal green for ALL cells (to display number clearly)
+        ctx.fillStyle = varColor('terminal-green'); 
+        ctx.font = "bold 18px monospace";
+        ctx.fillText(cellValue, X + CELL_SIZE / 2, Y + CELL_SIZE / 2 + 6);
+    }
+}
+
+/** Helper to retrieve CSS variables for canvas drawing */
+function varColor(name) {
+    const root = document.documentElement;
+    // Map simplified names to full CSS variable names
+    const map = {
+        'terminal-green': '--color-terminal-green',
+        'op-sign': '--syntax-op-sign',
+        'value': '--syntax-value',
+        'white-glow': '--color-white-glow', // New
+    };
+    const cssVar = map[name] || `--color-${name}`;
+    return getComputedStyle(root).getPropertyValue(cssVar).trim();
+}
+
+// ---------------- Run BrainFree (ASYNC) ----------------
+async function runBrainFree(){
+    const code = document.getElementById('code').value;
+    const outCanvas = document.getElementById('outputCanvas');
+    const ctx = outCanvas.getContext('2d');
+    
+    // Update canvas dimensions based on current window size
+    canvasWidth = outCanvas.clientWidth;
+    outCanvas.width = canvasWidth;
+
+    // Clear canvas
+    ctx.fillStyle="#1a1a1a";
+    ctx.fillRect(0,0,canvasWidth,canvasHeight);
+    
+    // Draw Output Title
+    ctx.fillStyle=varColor('terminal-green');
+    ctx.font="bold 24px monospace";
+    ctx.fillText(">> EXECUTION OUTPUT", 20, 40);
+
+    // Scroll Hint
+    ctx.fillStyle="#555";
+    ctx.font="12px monospace";
+    ctx.textAlign = "right";
+    ctx.fillText("Scroll wheel over tape to navigate cells", canvasWidth - 20, 20);
+    ctx.textAlign = "left"; // Reset alignment
+
+    try {
+        const bf = brainFreeToBF(parseCells(code));
+        const result = await runBrainfuck(bf); // AWAIT execution
+        
+        // Display Output Text
+        ctx.fillStyle=varColor('terminal-green');
+        ctx.font="18px monospace";
+        ctx.fillText(result.output || "(No output generated)", 20, 80);
+        
+        // Draw Memory Tape (Canvas version)
+        drawCanvasMemoryTape(ctx, result.tape, result.pointer, currentTapeStartIndex); // Pass current index
+        
+    } catch(e) {
+        // Display custom error message on the canvas
+        ctx.fillStyle=varColor('op-sign'); // Bright Pink/Red for errors
+        ctx.font="bold 18px monospace";
+        ctx.fillText("ERROR: " + e.message, 20, 80);
+        
+        // Draw an empty tape view on error 
+        drawCanvasMemoryTape(ctx, Array(30000).fill(0), 0, currentTapeStartIndex); // Pass current index
+    }
+}
+
+// ---------------- Syntax Highlighting ----------------
+function highlightCode() {
+    const codeArea = document.getElementById('code');
+    const highlighter = document.getElementById('codeHighlighter');
+    let code = codeArea.value;
+    
+    // 1. Escape HTML characters (must be done first)
+    let highlightedHTML = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    // Helper to wrap tokens
+    const wrap = (match, className) => `<span class="${className}">${match}</span>`;
+
+    // Sequential replacements are used for reliable tokenization:
+
+    // 2. Brackets: [, ], {, } (Structural elements)
+    highlightedHTML = highlightedHTML.replace(/([\[\]{}])/g, (match) => wrap(match, 'syntaxBracket'));
+
+    // 3. I/O Functions: in, out (Keywords)
+    highlightedHTML = highlightedHTML.replace(/(\b(in|out)\b)/g, (match) => wrap(match, 'syntaxFunc'));
+    
+    // 4. Cell/Pointer Token: Capture 'cell' followed by an optional space, sign, and digits.
+    highlightedHTML = highlightedHTML.replace(/(cell\s*[+\-]?\s*\d*)/g, (match) => {
+        if (match.trim().startsWith('cell')) {
+            return wrap(match, 'syntaxCell');
+        }
+        return match;
+    });
+
+    // 5. Operator Signs: + and - (only those not captured by the cell token, usually in the :value: field)
+    highlightedHTML = highlightedHTML.replace(/([+\-])/g, (match) => wrap(match, 'syntaxOpSign'));
+
+    // 6. Number Values: Digits (only those not captured by the cell token)
+    highlightedHTML = highlightedHTML.replace(/(\d+)/g, (match) => wrap(match, 'syntaxValue'));
+    
+    // 7. Colons: : (Delimiters)
+    highlightedHTML = highlightedHTML.replace(/:/g, (match) => wrap(match, 'syntaxColon'));
+
+    // Set the highlighted HTML and sync scroll
+    highlighter.innerHTML = highlightedHTML;
+    highlighter.scrollTop = codeArea.scrollTop;
+}
+
+
+// ---------------- Canvas Scroll Handler ----------------
+const TAPE_MAX_SIZE = 30000;
+const SCROLL_STEP = 5; // Scroll by 5 cells at a time
+
+function handleTapeScroll(e) {
+    e.preventDefault(); // Stop page scrolling
+    const outCanvas = document.getElementById('outputCanvas');
+    const PADDING = 20;
+    const CELL_SIZE = 40;
+    const GAP = 5;
+    // Calculate the number of cells visible to set the upper limit correctly
+    const CELLS_TO_DISPLAY = Math.floor((outCanvas.clientWidth - 2 * PADDING) / (CELL_SIZE + GAP));
+
+    if (e.deltaY > 0) {
+        // Scrolling down (move view right, increasing index)
+        // Ensure we don't scroll past the tape's maximum size minus the number of cells displayed
+        currentTapeStartIndex = Math.min(TAPE_MAX_SIZE - CELLS_TO_DISPLAY, currentTapeStartIndex + SCROLL_STEP);
+    } else if (e.deltaY < 0) {
+        // Scrolling up (move view left, decreasing index)
+        currentTapeStartIndex = Math.max(0, currentTapeStartIndex - SCROLL_STEP);
+    }
+    
+    // Redraw the canvas to show the newly scrolled view
+    runBrainFree(); 
+}
+
+// ---------------- Event Listeners ----------------
+const codeArea = document.getElementById('code');
+
+// Highlight code on every input and sync scroll
+codeArea.addEventListener('input', highlightCode);
+codeArea.addEventListener('scroll', () => {
+    document.getElementById('codeHighlighter').scrollTop = codeArea.scrollTop;
+});
+
+codeArea.addEventListener('keydown', function(e){
+    if(e.key === "Enter") {
+        if(e.shiftKey){
+            // Allows Shift+Enter to create a newline
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = this.value.substring(0,start) + "\n" + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 1;
+            e.preventDefault();
+            highlightCode(); // Update highlighting after adding newline
+        } else {
+            // Enter runs the code
+            e.preventDefault();
+            runBrainFree();
+        }
+    }
+});
+
+// ---------------- ASCII Side Panel ----------------
+function getAsciiChar(code){
+    if(code >= 32 && code <= 126) return String.fromCharCode(code);
+    else if(code >= 128 && code <= 255) return String.fromCharCode(code);
+    return ' ';
+}
+function openAsciiPanel(){
+    const panel = document.getElementById('asciiPanel');
+    panel.style.width = "400px";
+    const table = document.getElementById('asciiTable');
+    table.innerHTML = "<tr><th>Decimal</th><th>Character</th></tr>";
+    // Loop only up to 255 as requested
+    for(let i = 0; i <= 255; i++){
+        const char = getAsciiChar(i);
+        table.insertAdjacentHTML('beforeend', `<tr><td>${i}</td><td>${char}</td></tr>`);
+    }
+    mainContent.classList.add('blurred'); // ADD BLUR EFFECT
+}
+function closeAsciiPanel(){ 
+    document.getElementById('asciiPanel').style.width = "0"; 
+    mainContent.classList.remove('blurred'); // REMOVE BLUR EFFECT
+}
+
+// ---------------- Save / Load / Share (Updated with Message Box) ----------------
+function saveSnippet(){
+    localStorage.setItem('brainfreeSnippet', document.getElementById('code').value);
+    showMessageBox("Code saved locally!", false, "OK");
+}
+
+function loadSnippet(){
+    const code = localStorage.getItem('brainfreeSnippet');
+    if(code) {
+      document.getElementById('code').value = code;
+      highlightCode(); // Highlight after loading
+      showMessageBox("Code loaded successfully!", false, "OK");
+    } else {
+      showMessageBox("No saved code found.", false, "OK");
+    }
+}
+
+function shareSnippet(){
+    const code = encodeURIComponent(document.getElementById('code').value);
+    const shareURL = window.location.origin + window.location.pathname + "?code=" + code;
+    
+    // Show prompt in custom box, setting the input value to the URL
+    showMessageBox("Share this URL:", true, "Copy Link");
+    document.getElementById('messageInput').value = shareURL;
+    document.getElementById('messageInput').select();
+}
+
+window.addEventListener('load', function(){
+    const outCanvas = document.getElementById('outputCanvas');
+    canvasWidth = outCanvas.clientWidth;
+    outCanvas.width = canvasWidth;
+
+    // Load URL parameter code if available
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if(code) document.getElementById('code').value = decodeURIComponent(code);
+    
+    // Initial setup
+    highlightCode();
+
+    // Add scroll listener to canvas
+    outCanvas.addEventListener('wheel', handleTapeScroll);
+    
+    // Initial run to draw the blank canvas/memory tape
+    runBrainFree(); 
+});
+
+window.addEventListener('resize', function() {
+    // Redraw canvas on resize to maintain responsiveness
+    const outCanvas = document.getElementById('outputCanvas');
+    canvasWidth = outCanvas.clientWidth;
+    outCanvas.width = canvasWidth;
+    runBrainFree();
+});
+
+// ---------------- Playground Examples ----------------
+function loadExample(){
+    const example = document.getElementById('exampleSelect').value;
+    if(example) {
+        document.getElementById('code').value = example;
+        highlightCode(); // Highlight after loading example
+        runBrainFree(); // Run immediately to update canvas visualization
+    }
+}
+</script>
+</body>
+</html>
