@@ -1,4 +1,4 @@
-importScripts('brainfree.js'); // import shared code
+importScripts('brainfree.js');
 
 onmessage = function(e){
     const code = e.data;
