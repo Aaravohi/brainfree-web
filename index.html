@@ -147,7 +147,21 @@
 let worker = new Worker('worker.js');
 
 worker.onmessage = function(e){
-    const output = e.data;
+    const msg = e.data;
+    if(msg.type === 'output'){
+        displayOutput(msg.data);
+    } else if(msg.type === 'needInput'){
+        const inp = prompt("Input a char:");
+        worker.postMessage({type:'input', data: inp || '\0'});
+    }
+};
+
+function runBrainFree(){
+    const code = document.getElementById('code').value;
+    worker.postMessage({type:'run', code: code});
+}
+
+function displayOutput(output){
     const outCanvas = document.getElementById('outputCanvas');
     const ctx = outCanvas.getContext('2d');
     ctx.fillStyle="#222";
@@ -155,7 +169,7 @@ worker.onmessage = function(e){
     ctx.fillStyle="#0f0";
     ctx.font="20px monospace";
     ctx.fillText(output,10,40);
-};
+}
 
 // ---------------- Run BrainFree ----------------
 function runBrainFree(){
@@ -231,3 +245,4 @@ function loadExample(){
 <p style="text-align:right; color:#0f32bf; margin-top:20px; font-size:14px;">Made by Aaravohi</p>
 </body>
 </html>
+
