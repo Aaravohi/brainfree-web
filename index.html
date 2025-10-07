@@ -29,7 +29,8 @@
     display:block; 
     margin: 10px auto;
   }
-  button, select { padding:8px 15px; margin:5px; font-family: monospace; }
+  button { padding:8px 15px; margin:5px; font-family: monospace; }
+  select { padding:5px 10px; margin:5px; }
   .documentation { 
     width:80%; 
     margin: 20px auto; 
@@ -80,7 +81,6 @@
 <h2 style="font-size:24px; margin-top:0;">Interpreter</h2>
 
 <textarea id="code" placeholder="Enter BrainFree code here..." spellcheck="false"></textarea>
-
 <div>
   <button onclick="runBrainFree()">Run</button>
   <button onclick="openAsciiPanel()">ASCII Values</button>
@@ -96,55 +96,137 @@
 
 <canvas id="outputCanvas" width="800" height="100"></canvas>
 
-<!-- ---------------- BrainFree Documentation ---------------- -->
 <div class="documentation">
   <h2>BrainFree Language Guide</h2>
-  <p>BrainFree is a simplified language inspired by Brainf***, created by Aaravohi for fun and educational purposes. You manipulate memory cells with explicit commands to create output.</p>
-
+  <p>BrainFree is a simplified language inspired by Brainf***, (and made by Aaravohi) designed for educational and fun purposes. You manipulate “cells” in memory with explicit instructions.</p>
+  
   <p><strong>Cells:</strong> <code>[cell_id:value:function]</code></p>
   <ul>
-    <li><strong>cell_id</strong>: moves the pointer relative to current cell.
+    <li><strong>cell_id</strong>: Moves the pointer relative to the current cell. Examples:
       <ul>
         <li><code>cell0</code> → start at cell 0</li>
-        <li><code>cell+1</code> → move one cell right</li>
-        <li><code>cell-2</code> → move two cells left</li>
+        <li><code>cell+1</code> → move one cell to the right</li>
+        <li><code>cell-2</code> → move two cells to the left</li>
       </ul>
     </li>
-    <li><strong>value</strong>: change numeric value.
+    <li><strong>value</strong>: Change the cell’s numeric value. Examples:
       <ul>
-        <li><code>+5</code> → add 5</li>
-        <li><code>-3</code> → subtract 3</li>
+        <li><code>+5</code> → add 5 to the cell</li>
+        <li><code>-3</code> → subtract 3 from the cell</li>
         <li><code></code> → no change</li>
       </ul>
     </li>
-    <li><strong>function</strong>: input/output actions.
+    <li><strong>function</strong>: Perform input/output actions.
       <ul>
-        <li><code>out</code> → output ASCII char (.)</li>
-        <li><code>in</code> → input a char (,)</li>
+        <li><code>out</code> → output the ASCII character corresponding to the cell’s value (.)</li>
+        <li><code>in</code> → input a character into the cell (,)</li>
         <li><code></code> → no function</li>
       </ul>
     </li>
   </ul>
-
-  <p><strong>Loops:</strong> <code>{ ... }</code> repeats enclosed commands while current cell is nonzero (Brainf*** style <code>[ ... ]</code>).</p>
-
+  
+  <p><strong>Loops:</strong> <code>{ ... }</code> repeats the enclosed commands while the current cell is nonzero, similar to Brainf***’s <code>[ ... ]</code>.</p>
+  
   <p><strong>Example:</strong></p>
   <pre>
 [cell+2:+5:out]  → Move two cells forward, add 5, output character
   </pre>
-
-  <p>Combine multiple cells and loops to create complex programs or print messages creatively.</p>
+  
+  <p>You can combine multiple cells and loops to create complex programs, print messages, or manipulate memory values creatively!</p>
 </div>
 
-<!-- ---------------- ASCII Panel ---------------- -->
 <div id="asciiPanel">
   <span class="closeBtn" onclick="closeAsciiPanel()">&times;</span>
   <h3 style="text-align:center; color:#0f0;">ASCII Table</h3>
   <table id="asciiTable"></table>
 </div>
 
-<!-- ---------------- Scripts ---------------- -->
 <script src="brainfree.js"></script>
+
+<script>
+let worker = new Worker('worker.js');
+
+worker.onmessage = function(e){
+    const output = e.data;
+    const outCanvas = document.getElementById('outputCanvas');
+    const ctx = outCanvas.getContext('2d');
+    ctx.fillStyle="#222";
+    ctx.fillRect(0,0,outCanvas.width,outCanvas.height);
+    ctx.fillStyle="#0f0";
+    ctx.font="20px monospace";
+    ctx.fillText(output,10,40);
+};
+
+// ---------------- Run BrainFree ----------------
+function runBrainFree(){
+    const code = document.getElementById('code').value;
+    worker.postMessage(code);
+}
+
+// ---------------- Run with Enter / Shift+Enter ----------------
+const codeArea = document.getElementById('code');
+codeArea.addEventListener('keydown', function(e){
+    if(e.key === "Enter") {
+        if(e.shiftKey){
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = this.value.substring(0,start) + "\n" + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 1;
+            e.preventDefault();
+        } else {
+            e.preventDefault();
+            runBrainFree();
+        }
+    }
+});
+
+// ---------------- ASCII Side Panel ----------------
+function getAsciiChar(code){
+    if(code >= 32 && code <= 126) return String.fromCharCode(code);
+    else if(code >= 128 && code <= 256) return String.fromCharCode(code);
+    return ' ';
+}
+function openAsciiPanel(){
+    const panel = document.getElementById('asciiPanel');
+    panel.style.width = "400px";
+    const table = document.getElementById('asciiTable');
+    table.innerHTML = "<tr><th>Decimal</th><th>Char</th></tr>";
+    for(let i = 0; i <= 256; i++){
+        const char = getAsciiChar(i);
+        table.insertAdjacentHTML('beforeend', `<tr><td>${i}</td><td>${char}</td></tr>`);
+    }
+}
+function closeAsciiPanel(){ document.getElementById('asciiPanel').style.width = "0"; }
+
+// ---------------- Save / Load ----------------
+function saveSnippet(){
+    localStorage.setItem('brainfreeSnippet', document.getElementById('code').value);
+    alert("Code saved locally!");
+}
+function loadSnippet(){
+    const code = localStorage.getItem('brainfreeSnippet');
+    if(code) document.getElementById('code').value = code;
+    else alert("No saved code found.");
+}
+
+// ---------------- Share ----------------
+function shareSnippet(){
+    const code = encodeURIComponent(document.getElementById('code').value);
+    const shareURL = window.location.origin + window.location.pathname + "?code=" + code;
+    prompt("Share this URL:", shareURL);
+}
+window.addEventListener('load', function(){
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if(code) document.getElementById('code').value = decodeURIComponent(code);
+});
+
+// ---------------- Playground Examples ----------------
+function loadExample(){
+    const example = document.getElementById('exampleSelect').value;
+    if(example) document.getElementById('code').value = example;
+}
+</script>
 
 <p style="text-align:right; color:#0f32bf; margin-top:20px; font-size:14px;">Made by Aaravohi</p>
 </body>
